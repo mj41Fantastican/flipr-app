@@ -1,0 +1,36 @@
+{
+  "name": "flipr",
+  "version": "1.0.0",
+  "description": "Loser's Lounge Coin Flip - The worse you lose, the more legendary you become",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "axios": "^1.6.0",
+    "dotenv": "^17.2.3",
+    "framer-motion": "^10.18.0",
+    "next": "^14.2.33",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "use-sound": "^4.0.4",
+    "viem": "^2.39.2",
+    "wagmi": "^2.19.4"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@types/node": "20.10.0",
+    "@types/react": "18.2.42",
+    "@types/react-dom": "18.2.17",
+    "autoprefixer": "10.4.16",
+    "hardhat": "^2.27.0",
+    "postcss": "8.4.32",
+    "tailwindcss": "3.3.6",
+    "typescript": "5.3.2"
+  }
+}
