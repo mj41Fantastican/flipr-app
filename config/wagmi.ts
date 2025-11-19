@@ -9,7 +9,7 @@ export const config = getDefaultConfig({
 });
 
 // Contract addresses
-export const FLIPR_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_FLIPR_CONTRACT_ADDRESS || '0xbA0a2153B7E3a3Ce91263a9418DD7350d07E67fe';
+export const FLIPR_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_FLIPR_CONTRACT_ADDRESS || '0x7E63aB8dB87b92B8602ea878D6Abc7D7Caf64B22';
 export const USDC_CONTRACT_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base mainnet USDC
 
 // Treasury address
