@@ -4,21 +4,8 @@ import { parseUnits, parseEther } from 'viem';
 import { motion, AnimatePresence } from 'framer-motion';
 import useSound from 'use-sound';
 import axios from 'axios';
-import { FLIPR_CONTRACT_ADDRESS, USDC_CONTRACT_ADDRESS } from '../config/wagmi';
+import { FLIPR_CONTRACT_ADDRESS, CLASSIC_FEE, DEGEN_FEE, MINT_FEE } from '../config/wagmi';
 import roastsData from '../public/roasts.json';
-// USDC ABI for Base
-const USDC_ABI = [
-  {
-    name: 'approve',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  }
-] as const;
 
 type GameMode = 'classic' | 'degenerate';
 type CoinType = 'kennedy' | 'busty_betty';
@@ -35,8 +22,6 @@ export default function FliprGame() {
   // Separate write contracts for flip and mint
   const { writeContract: writeFlip, data: flipHash } = useWriteContract();
   const { writeContract: writeMint, data: mintHash } = useWriteContract();
-  const { writeContract: approveUSDC, data: approveHash } = useWriteContract();
-const { isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
   
   // Wait for transactions
   const { isLoading: isFlipConfirming, isSuccess: isFlipSuccess } = useWaitForTransactionReceipt({ hash: flipHash });
@@ -58,8 +43,6 @@ const { isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({ hash: app
   const [usedRoasts, setUsedRoasts] = useState<string[]>([]);
   const [consecutiveLosses, setConsecutiveLosses] = useState(0);
   const [mintError, setMintError] = useState<string>('');
-  const [isApproving, setIsApproving] = useState(false);
-const [approvalComplete, setApprovalComplete] = useState(false);
   
   // Edge landing tracking (69, 41, 69, 41 pattern per wallet)
   // Secret mechanic: Coin lands on edge at flip 69, then 110, then 179, then 220...
@@ -104,16 +87,6 @@ const [approvalComplete, setApprovalComplete] = useState(false);
     }
   }, [isMintSuccess, mintHash]);
 
-  // Handle successful USDC approval
-useEffect(() => {
-  if (isApproveSuccess) {
-    setIsApproving(false);
-    setApprovalComplete(true);
-    // Auto-mint after approval
-    handleMintAfterApproval();
-  }
-}, [isApproveSuccess]);
-
   // Play appropriate background music when mode is selected
   useEffect(() => {
     if (gameMode === 'classic') {
@@ -139,7 +112,7 @@ useEffect(() => {
 
   // Start session (FREE - payment only on mint)
   const startSession = async () => {
-    if (!gameMode) return;
+    if (!isConnected || !gameMode) return;
 
     setSessionActive(true);
     setGameOver(false);
@@ -305,79 +278,72 @@ useEffect(() => {
     return randomRoast;
   };
 
-  // Approve USDC first
-const mintNFT = async () => {
-  if (!gameOver || currentStreak < 1) return;
-  
-  if (!isConnected || !address) {
-    alert('Please connect your wallet to mint your NFT!');
-    return;
-  }
+  // Mint NFT (THIS is where payment happens)
+  const mintNFT = async () => {
+    if (!gameOver || currentStreak < 1) return;
 
-  try {
-    setMintError('');
-    setIsApproving(true);
-    
-    // Calculate USDC fee (6 decimals: 410000 = $0.41, 690000 = $0.69)
-    const usdcFee = gameMode === 'classic' ? 410000n : 690000n;
-    
-    // Approve USDC spending
-    approveUSDC({
-      address: USDC_CONTRACT_ADDRESS as `0x${string}`,
-      abi: USDC_ABI,
-      functionName: 'approve',
-      args: [FLIPR_CONTRACT_ADDRESS as `0x${string}`, usdcFee],
-    });
-    
-  } catch (error) {
-    console.error('❌ Failed to approve USDC:', error);
-    setIsApproving(false);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    setMintError(errorMessage);
-    alert(`Approval failed: ${errorMessage}`);
-  }
-};
-
-// Mint after approval
-const handleMintAfterApproval = async () => {
-  if (!address) return;
-
-  try {
-    const FLIPR_ABI = [
-      {
-        name: 'mintLoserNFT',
-        type: 'function',
-        stateMutability: 'nonpayable',
-        inputs: [
-          { name: 'streak', type: 'uint256' },
-          { name: 'mode', type: 'string' },
-          { name: 'coin', type: 'string' },
-          { name: 'roast', type: 'string' }
-        ],
-        outputs: [{ name: '', type: 'uint256' }]
-      }
-    ];
-    
-    const coinName = coinType === 'kennedy' ? 'Kennedy Half-Dollar' : 'Busty Betty 80s Novelty Coin';
-    const roastText = currentRoast || "You lost. That's it.";
-    const modeText = gameMode === 'classic' ? 'classic' : 'degen';
-    
-    writeMint({
-      address: FLIPR_CONTRACT_ADDRESS as `0x${string}`,
-      abi: FLIPR_ABI,
-      functionName: 'mintLoserNFT',
-      args: [BigInt(currentStreak), modeText, coinName, roastText],
-    });
-    
-  } catch (error) {
-    console.error('❌ Failed to mint NFT:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    setMintError(errorMessage);
-    alert(`Mint failed: ${errorMessage}`);
-  }
-};
-
+    try {
+      setMintError(''); // Clear any previous errors
+      console.log('🎯 Starting mint process...');
+      console.log('Current streak:', currentStreak);
+      console.log('Game mode:', gameMode);
+      console.log('Coin type:', coinType);
+      console.log('Roast:', currentRoast);
+      console.log('Wallet address:', address);
       
+      // Your NEW on-chain contract address (update after deploying FliprOnChain.sol)
+      const FLIPR_CONTRACT = '0xc5dFAeB0aF28D52ca80Dc97b3F1fDe8cE49D962a'; // UPDATE THIS!
+      
+      // On-chain ABI
+      const FLIPR_ABI = [
+        {
+          name: 'mintLoserNFT',
+          type: 'function',
+          stateMutability: 'payable',
+          inputs: [
+            { name: 'streak', type: 'uint256' },
+            { name: 'mode', type: 'uint8' },  // 0 = CLASSIC, 1 = DEGEN
+            { name: 'coin', type: 'uint8' },   // 0 = KENNEDY, 1 = BUSTY_BETTY
+            { name: 'roast', type: 'string' }
+          ],
+          outputs: []
+        }
+      ];
+
+      // Calculate mint fee in ETH
+      const mintFeeETH = gameMode === 'classic' ? '0.00041' : '0.00069';
+      
+      // Map game mode to enum
+      const modeEnum = gameMode === 'classic' ? 0 : 1;
+      
+      // Map coin type to enum
+      const coinEnum = coinType === 'kennedy' ? 0 : 1;
+      
+      // Get roast text (or default if none)
+      const roastText = currentRoast || "You lost. That's it. That's the roast.";
+      
+      console.log('📝 Calling mintLoserNFT on contract:', FLIPR_CONTRACT);
+      console.log('💰 Mint fee:', mintFeeETH, 'ETH');
+      console.log('Parameters:', { streak: currentStreak, mode: modeEnum, coin: coinEnum, roast: roastText });
+      
+      // Call the contract function with all parameters
+      writeMint({
+        address: FLIPR_CONTRACT,
+        abi: FLIPR_ABI,
+        functionName: 'mintLoserNFT',
+        args: [BigInt(currentStreak), modeEnum, coinEnum, roastText],
+        value: parseEther(mintFeeETH),
+      });
+      
+      console.log('✅ Mint transaction sent! Waiting for confirmation...');
+
+    } catch (error) {
+      console.error('❌ Failed to mint NFT:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setMintError(errorMessage);
+      alert(`Mint failed: ${errorMessage}`);
+    }
+  };
 
   // Render coin based on result
   const renderCoin = () => {
@@ -566,7 +532,7 @@ const handleMintAfterApproval = async () => {
           {!sessionActive ? (
             <button
               onClick={startSession}
-              disabled={!gameMode}
+              disabled={!isConnected}
               className="bg-grimy-gold hover:bg-yellow-600 text-black font-bold py-4 px-12 rounded-lg text-2xl transition disabled:opacity-50"
             >
               Start Free Session
@@ -584,7 +550,7 @@ const handleMintAfterApproval = async () => {
                     disabled={isMintConfirming}
                     className="bg-grimy-gold hover:bg-yellow-600 text-black font-bold py-4 px-12 rounded-lg text-xl transition animate-pulse disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-{isApproving ? 'APPROVING USDC...' : isMintConfirming ? 'MINTING...' : `MINT THIS SHAME ($${gameMode === 'classic' ? '0.41' : '0.69'} USDC)`}
+                    {isMintConfirming ? 'MINTING...' : `MINT THIS SHAME ($${gameMode === 'classic' ? '0.41' : '0.69'})`}
                   </button>
                 )}
                 
